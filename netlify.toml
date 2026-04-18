@@ -1,0 +1,20 @@
+# netlify.toml
+# Tells Netlify how to build and serve your site.
+
+[build]
+  # The folder containing your index.html
+  publish = "."
+  # Where your serverless functions live
+  functions = "netlify/functions"
+
+# Redirect /api/ask to the serverless function (clean URL)
+[[redirects]]
+  from = "/api/ask"
+  to = "/.netlify/functions/ask-claude"
+  status = 200
+
+# Cache static assets
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
