@@ -1,9 +1,7 @@
 // netlify/functions/ask-claude.js
-// Secure proxy — ES Module format for modern Netlify runtime
 
-export default async (request, context) => {
+const handler = async (event) => {
 
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -11,39 +9,30 @@ export default async (request, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight OPTIONS request
-  if (request.method === 'OPTIONS') {
-    return new Response('', { status: 200, headers });
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
   }
 
-  // Only allow POST
-  if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers }
-    );
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  // Get API key from Netlify environment variables
-  const apiKey = Netlify.env.get('ANTHROPIC_API_KEY');
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'API key not configured. Add ANTHROPIC_API_KEY in Netlify environment variables.' }),
-      { status: 500, headers }
-    );
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'API key not configured. Add ANTHROPIC_API_KEY in Netlify environment variables.' })
+    };
   }
 
   try {
-    const { question, summary } = await request.json();
+    const { question, summary } = JSON.parse(event.body);
 
     if (!question) {
-      return new Response(
-        JSON.stringify({ error: 'No question provided' }),
-        { status: 400, headers }
-      );
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No question provided' }) };
     }
 
-    // Call Anthropic API securely from the server
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -61,28 +50,25 @@ export default async (request, context) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      return new Response(
-        JSON.stringify({ error: `Anthropic API error: ${response.status}`, details: errText }),
-        { status: response.status, headers }
-      );
+      return {
+        statusCode: response.status,
+        headers,
+        body: JSON.stringify({ error: `Anthropic API error: ${response.status}`, details: errText })
+      };
     }
 
     const data = await response.json();
     const answer = data.content?.[0]?.text || 'No response received.';
 
-    return new Response(
-      JSON.stringify({ answer }),
-      { status: 200, headers }
-    );
+    return { statusCode: 200, headers, body: JSON.stringify({ answer }) };
 
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: 'Server error', details: err.message }),
-      { status: 500, headers }
-    );
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Server error', details: err.message })
+    };
   }
 };
 
-export const config = {
-  path: '/api/ask'
-};
+module.exports = { handler };
